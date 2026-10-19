@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>
+        Voice Controlled Photo Editor
+    </title>
+
+    <style>
+
+        body {
+            font-family: Arial, sans-serif;
+            margin: 30px;
+            background: #f5f5f5;
+        }
+
+        h1 {
+            margin-bottom: 30px;
+        }
+
+        section {
+            background: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 10px;
+        }
+
+        .image-box {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+        }
+
+        .image-container {
+            width: 420px;
+        }
+
+        .image-container img {
+            max-width: 400px;
+            max-height: 400px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            object-fit: contain;
+        }
+
+        #options {
+            display: grid;
+            grid-template-columns:
+                repeat(auto-fill, minmax(220px, 1fr));
+
+            gap: 20px;
+        }
+
+        .option {
+            border: 1px solid #ccc;
+            padding: 15px;
+            border-radius: 8px;
+            background: #fafafa;
+        }
+
+        .option img {
+            width: 180px;
+            height: 130px;
+            object-fit: cover;
+            display: block;
+            margin-bottom: 10px;
+            border-radius: 6px;
+        }
+
+        button {
+            padding: 10px 18px;
+            font-size: 15px;
+            cursor: pointer;
+            border-radius: 6px;
+            border: 1px solid #888;
+        }
+
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        #voiceButton {
+            font-size: 18px;
+            padding: 12px 24px;
+        }
+
+        #voiceStatus {
+            font-weight: bold;
+        }
+
+        #voiceText {
+            width: 90%;
+            max-width: 700px;
+            font-size: 17px;
+            padding: 10px;
+        }
+
+        #selectedOption {
+            font-weight: bold;
+        }
+
+        .error {
+            color: #b00020;
+        }
+
+        .success {
+            color: #087f23;
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+    <h1>
+        Voice Controlled Photo Editor
+    </h1>
+
+
+    <!-- =====================================================
+         INPUT IMAGE
+         ===================================================== -->
+
+    <section>
+
+        <h2>
+            Input Image
+        </h2>
+
+        <input
+            type="file"
+            id="imageInput"
+            accept="image/*"
+        >
+
+        <br>
+        <br>
+
+        <div class="image-container">
+
+            <img
+                id="inputPreview"
+                alt="Input image"
+            >
+
+        </div>
+
+    </section>
+
+
+    <!-- =====================================================
+         BACKGROUND OPTIONS
+         ===================================================== -->
+
+    <section>
+
+        <h2>
+            Background Options
+        </h2>
+
+        <p>
+            Select an option manually or use the voice command.
+        </p>
+
+        <div id="options">
+
+            Loading backgrounds...
+
+        </div>
+
+    </section>
+
+
+    <!-- =====================================================
+         SELECTED OPTION
+         ===================================================== -->
+
+    <section>
+
+        <h2>
+            Selected Option
+        </h2>
+
+        <p id="selectedOption">
+            No option selected
+        </p>
+
+    </section>
+
+
+    <!-- =====================================================
+         EDITED IMAGE
+         ===================================================== -->
+
+    <section>
+
+        <h2>
+            Edited Image
+        </h2>
+
+        <div class="image-container">
+
+            <img
+                id="editedPreview"
+                alt="Edited image"
+            >
+
+        </div>
+
+        <p id="processingStatus"></p>
+
+    </section>
+
+
+    <!-- =====================================================
+         VOICE COMMAND
+         ===================================================== -->
+
+    <section>
+
+        <h2>
+            Voice Command
+        </h2>
+
+        <p>
+            Click the button and speak naturally.
+        </p>
+
+        <button
+            id="voiceButton"
+            type="button"
+        >
+            🎤 Start Voice Command
+        </button>
+
+        <p id="voiceStatus">
+            Ready
+        </p>
+
+
+        <h3>
+            Recognized Command
+        </h3>
+
+        <textarea
+            id="voiceText"
+            rows="3"
+            readonly
+            placeholder="Your recognized speech will appear here..."
+        ></textarea>
+
+    </section>
+
+
+<script>
+
+    // ========================================================
+    // ELEMENTS
+    // ========================================================
+
+    const imageInput =
+        document.getElementById(
+            "imageInput"
+        );
+
+    const inputPreview =
+        document.getElementById(
+            "inputPreview"
+        );
+
+    const editedPreview =
+        document.getElementById(
+            "editedPreview"
+        );
+
+    const optionsContainer =
+        document.getElementById(
+            "options"
+        );
+
+    const voiceButton =
+        document.getElementById(
+            "voiceButton"
+        );
+
+    const voiceStatus =
+        document.getElementById(
+            "voiceStatus"
+        );
+
+    const voiceText =
+        document.getElementById(
+            "voiceText"
+        );
+
+    const selectedOptionText =
+        document.getElementById(
+            "selectedOption"
+        );
+
+    const processingStatus =
+        document.getElementById(
+            "processingStatus"
+        );
+
+
+    // ========================================================
+    // VARIABLES
+    // ========================================================
+
+    let selectedOption = null;
+
+    let backgroundRecords = [];
+
+    let selectedImageFile = null;
+
+
+    // ========================================================
+    // IMAGE SELECTION
+    // ========================================================
+
+    imageInput.addEventListener(
+        "change",
+        function () {
+
+            const file =
+                this.files[0];
+
+            if (!file) {
+                return;
+            }
+
+            selectedImageFile = file;
+
+            inputPreview.src =
+                URL.createObjectURL(file);
+
+            editedPreview.removeAttribute(
+                "src"
+            );
+
+            processingStatus.textContent =
+                "";
+
+        }
+    );
+
+
+    // ========================================================
+    // LOAD BACKGROUNDS
+    // ========================================================
+
+    async function loadBackgrounds() {
+
+        try {
+
+            const response =
+                await fetch(
+                    "/api/backgrounds"
+                );
+
+            if (!response.ok) {
+
+                throw new Error(
+                    "Could not load backgrounds."
+                );
+
+            }
+
+            backgroundRecords =
+                await response.json();
+
+            createOptions();
+
+        }
+        catch (error) {
+
+            console.error(error);
+
+            optionsContainer.innerHTML =
+                `<p class="error">
+                    Could not load background data.
+                </p>`;
+
+        }
+
+    }
+
+
+    // ========================================================
+    // CREATE OPTIONS
+    // ========================================================
+
+    function createOptions() {
+
+        optionsContainer.innerHTML =
+            "";
+
+
+        // ----------------------------------------------------
+        // OPTION 1
+        // ----------------------------------------------------
+
+        createOption(
+            1,
+            "Background Removal",
+            null
+        );
+
+
+        // ----------------------------------------------------
+        // OPTION 2
+        // ----------------------------------------------------
+
+        createOption(
+            2,
+            "Background Blur",
+            null
+        );
+
+
+        // ----------------------------------------------------
+        // CSV BACKGROUNDS
+        // ----------------------------------------------------
+
+        for (
+            const record of backgroundRecords
+        ) {
+
+            const optionNumber =
+                Number(record.img_id) + 2;
+
+            createOption(
+                optionNumber,
+                record.name,
+                record.url
+            );
+
+        }
+
+    }
+
+
+    // ========================================================
+    // CREATE SINGLE OPTION
+    // ========================================================
+
+    function createOption(
+        optionNumber,
+        name,
+        imageURL
+    ) {
+
+        const container =
+            document.createElement(
+                "div"
+            );
+
+        container.className =
+            "option";
+
+
+        const title =
+            document.createElement(
+                "h3"
+            );
+
+        title.textContent =
+            `Option ${optionNumber} - ${name}`;
+
+        container.appendChild(
+            title
+        );
+
+
+        if (imageURL) {
+
+            const image =
+                document.createElement(
+                    "img"
+                );
+
+            image.src =
+                imageURL;
+
+            image.alt =
+                name;
+
+            container.appendChild(
+                image
+            );
+
+        }
+
+
+        const button =
+            document.createElement(
+                "button"
+            );
+
+        button.textContent =
+            `Use Option ${optionNumber}`;
+
+
+        button.addEventListener(
+            "click",
+            function () {
+
+                selectOption(
+                    optionNumber
+                );
+
+            }
+        );
+
+
+        container.appendChild(
+            button
+        );
+
+        optionsContainer.appendChild(
+            container
+        );
+
+    }
+
+
+    // ========================================================
+    // SELECT OPTION
+    // ========================================================
+
+    async function selectOption(
+        optionNumber
+    ) {
+
+        selectedOption =
+            optionNumber;
+
+        selectedOptionText.textContent =
+            `Option ${optionNumber}`;
+
+        console.log(
+            "Selected option:",
+            optionNumber
+        );
+
+
+        // ----------------------------------------------------
+        // CHECK IMAGE
+        // ----------------------------------------------------
+
+        if (!selectedImageFile) {
+
+            processingStatus.textContent =
+                "Please select an input image first.";
+
+            processingStatus.className =
+                "error";
+
+            return;
+
+        }
+
+
+        // ----------------------------------------------------
+        // PROCESS
+        // ----------------------------------------------------
+
+        await processImage(
+            optionNumber
+        );
+
+    }
+
+
+    // ========================================================
+    // PROCESS IMAGE
+    // ========================================================
+
+    async function processImage(
+        optionNumber
+    ) {
+
+        processingStatus.textContent =
+            "Processing image...";
+
+        processingStatus.className =
+            "";
+
+
+        const formData =
+            new FormData();
+
+        formData.append(
+            "image",
+            selectedImageFile
+        );
+
+        formData.append(
+            "option",
+            optionNumber
+        );
+
+
+        try {
+
+            const response =
+                await fetch(
+                    "/process",
+                    {
+                        method: "POST",
+                        body: formData
+                    }
+                );
+
+
+            if (!response.ok) {
+
+                let errorMessage =
+                    "Image processing failed.";
+
+                try {
+
+                    const data =
+                        await response.json();
+
+                    if (data.error) {
+                        errorMessage =
+                            data.error;
+                    }
+
+                }
+                catch (e) {
+                    // Response was not JSON.
+                }
+
+                throw new Error(
+                    errorMessage
+                );
+
+            }
+
+
+            const blob =
+                await response.blob();
+
+
+            const imageURL =
+                URL.createObjectURL(
+                    blob
+                );
+
+
+            editedPreview.src =
+                imageURL;
+
+
+            processingStatus.textContent =
+                "Image processed successfully.";
+
+            processingStatus.className =
+                "success";
+
+        }
+        catch (error) {
+
+            console.error(error);
+
+            processingStatus.textContent =
+                "Error: " +
+                error.message;
+
+            processingStatus.className =
+                "error";
+
+        }
+
+    }
+
+
+    // ========================================================
+    // VOICE COMMAND
+    // ========================================================
+
+    voiceButton.addEventListener(
+        "click",
+        async function () {
+
+            // ------------------------------------------------
+            // CHECK IMAGE
+            // ------------------------------------------------
+
+            if (!selectedImageFile) {
+
+                voiceStatus.textContent =
+                    "Please select an image first.";
+
+                voiceStatus.className =
+                    "error";
+
+                return;
+
+            }
+
+
+            // ------------------------------------------------
+            // DISABLE BUTTON
+            // ------------------------------------------------
+
+            voiceButton.disabled =
+                true;
+
+            voiceStatus.textContent =
+                "🎤 Listening... Speak now.";
+
+            voiceStatus.className =
+                "";
+
+
+            voiceText.value =
+                "";
+
+
+            try {
+
+                // ------------------------------------------------
+                // IMPORTANT:
+                //
+                // We are NOT using browser SpeechRecognition.
+                //
+                // The Python backend accesses the computer
+                // microphone through speech_recognition.
+                //
+                // This request simply tells Python:
+                // "Start listening to my microphone."
+                // ------------------------------------------------
+
+                const response =
+                    await fetch(
+                        "/voice",
+                        {
+                            method: "POST"
+                        }
+                    );
+
+
+                const data =
+                    await response.json();
+
+
+                // ------------------------------------------------
+                // DISPLAY RECOGNIZED SPEECH
+                // ------------------------------------------------
+
+                if (data.text) {
+
+                    voiceText.value =
+                        data.text;
+
+                }
+
+
+                // ------------------------------------------------
+                // VOICE FAILED
+                // ------------------------------------------------
+
+                if (!data.success) {
+
+                    voiceStatus.textContent =
+                        "Error: " +
+                        data.error;
+
+                    voiceStatus.className =
+                        "error";
+
+                    return;
+
+                }
+
+
+                // ------------------------------------------------
+                // SPEECH -> TEXT SUCCESS
+                // ------------------------------------------------
+
+                voiceStatus.textContent =
+                    "Command received: " +
+                    data.text;
+
+                voiceStatus.className =
+                    "success";
+
+
+                // ------------------------------------------------
+                // EXECUTE COMMAND
+                // ------------------------------------------------
+
+                if (data.option) {
+
+                    await selectOption(
+                        data.option
+                    );
+
+                }
+
+            }
+            catch (error) {
+
+                console.error(error);
+
+                voiceStatus.textContent =
+                    "Voice request failed: " +
+                    error.message;
+
+                voiceStatus.className =
+                    "error";
+
+            }
+            finally {
+
+                voiceButton.disabled =
+                    false;
+
+            }
+
+        }
+    );
+
+
+    // ========================================================
+    // INITIALIZE
+    // ========================================================
+
+    loadBackgrounds();
+
+</script>
+
+</body>
+
+</html>
